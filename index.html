@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Gambia FLP — Term 3 Tracker</title>
+<style>
+  :root {
+    --brand: #003087;
+    --accent: #007F7F;
+    --bg: #F4F7FB;
+    --ink: #FFFFFF;
+    --muted: #C9D6EE;
+    --panel: #FFFFFF;
+    --text: #1B2330;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: var(--brand);
+    color: var(--ink);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    border-bottom: 4px solid var(--accent);
+  }
+  .titles { flex: 1 1 260px; min-width: 0; }
+  h1 { font-size: 17px; margin: 0; font-weight: bold; }
+  .brandline { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .stamp { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  button, .open {
+    font: inherit;
+    font-size: 13px;
+    font-weight: bold;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  button {
+    background: #FFFFFF;
+    color: var(--brand);
+    border: 0;
+  }
+  button:hover { background: #E8F0FB; }
+  button:disabled { opacity: .65; cursor: progress; }
+  .open {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid rgba(255,255,255,.55);
+  }
+  .open:hover { background: rgba(255,255,255,.12); }
+  .spin { display: inline-block; }
+  button[aria-busy="true"] .spin { animation: rot 0.9s linear infinite; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+  main { position: relative; flex: 1; min-height: 0; }
+  iframe { border: 0; width: 100%; height: 100%; display: block; background: var(--panel); }
+  .overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(244,247,251,.85);
+    font-size: 14px; color: var(--brand);
+    pointer-events: none;
+    transition: opacity .2s;
+  }
+  .overlay[hidden] { display: flex; opacity: 0; }
+  .hint {
+    display: none;
+    background: #FFF6E0; color: #5A4300;
+    font-size: 13px; padding: 8px 16px;
+    border-bottom: 1px solid #F0DCA8;
+  }
+  .hint a { color: var(--brand); font-weight: bold; }
+  .hint.show { display: block; }
+  footer {
+    font-size: 11px; color: #5B6678; text-align: center;
+    padding: 6px 16px; background: #FFFFFF; border-top: 1px solid #DDE4EF;
+  }
+  @media (max-width: 560px) {
+    h1 { font-size: 15px; }
+    .brandline { display: none; }
+    .stamp { width: 100%; order: 3; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="titles">
+    <h1>Gambia FLP — Term 3 Illustrations &amp; Materials Tracker</h1>
+    <div class="brandline">Ministry of Basic and Secondary Education | Republic of The Gambia | Gambia RISE Foundational Learning Project</div>
+  </div>
+  <div class="controls">
+    <span class="stamp" id="stamp">Loading…</span>
+    <button id="refresh" type="button" title="Reload the tracker with the latest data">
+      <span class="spin" aria-hidden="true">&#x21bb;</span> Refresh
+    </button>
+    <a class="open" id="open" target="_blank" rel="noopener">Open full page &#x2197;</a>
+  </div>
+</header>
+<div class="hint" id="hint">
+  The tracker is taking longer than usual to load. Press <b>Refresh</b>, or
+  <a id="hintLink" target="_blank" rel="noopener">open it directly in a new tab</a>.
+</div>
+<main>
+  <iframe id="tracker" title="Term 3 Tracker" allow="clipboard-write"></iframe>
+  <div class="overlay" id="overlay">Loading the latest tracker data…</div>
+</main>
+<footer>MoBSE / World Bank — Gambia RISE Foundational Learning Project · Data served live from the Term 3 tracker (Google Apps Script)</footer>
+
+<script>
+(function () {
+  var APP_URL = 'https://script.google.com/macros/s/AKfycbwP9PV0UJsaJvik4PSlWpZHV7LOqeOem3Zdrs4TjI118pfs7rKeVVU6ByJaQPLfrz7lzw/exec';
+  var SLOW_MS = 20000;
+
+  var frame = document.getElementById('tracker');
+  var btn = document.getElementById('refresh');
+  var stamp = document.getElementById('stamp');
+  var overlay = document.getElementById('overlay');
+  var hint = document.getElementById('hint');
+  var slowTimer = null;
+
+  document.getElementById('open').href = APP_URL;
+  document.getElementById('hintLink').href = APP_URL;
+
+  function fmt(d) {
+    return d.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function load() {
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    overlay.hidden = false;
+    hint.classList.remove('show');
+    stamp.textContent = 'Refreshing…';
+    clearTimeout(slowTimer);
+    slowTimer = setTimeout(function () { hint.classList.add('show'); }, SLOW_MS);
+    // Cache-buster so the browser never serves a stale copy of the web app.
+    frame.src = APP_URL + '?_r=' + Date.now();
+  }
+
+  frame.addEventListener('load', function () {
+    if (!frame.src) return;
+    clearTimeout(slowTimer);
+    hint.classList.remove('show');
+    overlay.hidden = true;
+    btn.disabled = false;
+    btn.removeAttribute('aria-busy');
+    stamp.textContent = 'Last refreshed ' + fmt(new Date());
+  });
+
+  btn.addEventListener('click', load);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r')) {
+      e.preventDefault();
+      load();
+    }
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>
